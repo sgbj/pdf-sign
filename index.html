@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"
+    />
+
+    <title></title>
+
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+      crossorigin="anonymous"
+    />
+    <link
+      href="https://fonts.googleapis.com/css?family=Satisfy&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        overflow: auto;
+        background: rgb(248, 249, 250);
+      }
+
+      .document-container {
+        display: inline-block;
+        min-width: 100%;
+        padding-top: 3rem;
+      }
+
+      .document-page {
+        margin: 1rem auto;
+        box-shadow: 0 0 1rem rgba(0, 0, 0, 0.12);
+        position: relative;
+      }
+
+      .document-page:not(:first-of-type) {
+        margin-top: 0;
+      }
+
+      .drawing-canvas {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+
+      .document-page-write .drawing-canvas {
+        z-index: 5;
+      }
+
+      .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
+        padding: 0.5rem;
+        box-shadow: 0 0 1rem rgba(0, 0, 0, 0.12);
+      }
+
+      .form-field {
+        position: absolute;
+        color: #000;
+        background: transparent;
+        border: 1px solid #d1d5da;
+        border-radius: 3px;
+        outline: none;
+        box-shadow: none;
+        resize: none;
+        font-size: 1em;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        padding: 0 !important;
+      }
+
+      .form-field:focus {
+        border-color: #2188ff;
+        outline: none;
+        box-shadow: 0 0 0 0.2em rgba(3, 102, 214, 0.3);
+      }
+
+      .form-field[disabled] {
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: #000 !important;
+        opacity: 1 !important;
+      }
+
+      .form-field-signature {
+        font-family: Satisfy, cursive;
+        font-size: 2em;
+        text-align: center;
+      }
+
+      .form-field-checkbox {
+        text-transform: uppercase;
+        font-size: 1.4em;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar navbar-expand-lg navbar-light bg-light">
+      <label for="scale-range" class="mr-2">Scale</label>
+      <input
+        type="range"
+        min=".5"
+        max="5"
+        step=".1"
+        id="scale-range"
+        class="custom-range"
+        style="max-width: 200px"
+      />
+      <span id="scale" class="ml-2"></span>
+
+      <div class="flex-grow-1"></div>
+
+      <span id="coords"></span>
+
+      <div class="flex-grow-1"></div>
+
+      <div class="custom-control custom-radio mr-3">
+        <input
+          checked
+          type="radio"
+          id="view"
+          class="custom-control-input"
+          accesskey="v"
+          name="action"
+        />
+        <label class="custom-control-label" for="view">View</label>
+      </div>
+      <div class="custom-control custom-radio mr-3">
+        <input
+          type="radio"
+          id="draw"
+          class="custom-control-input"
+          accesskey="w"
+          name="action"
+        />
+        <label class="custom-control-label" for="draw">Write</label>
+      </div>
+      <div class="custom-control custom-radio mr-3">
+        <input
+          type="radio"
+          id="type"
+          class="custom-control-input"
+          accesskey="t"
+          name="action"
+        />
+        <label class="custom-control-label" for="type">Type</label>
+      </div>
+    </div>
+
+    <div class="document-container"></div>
+
+    <pre class="output"></pre>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.228/pdf.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script>
+      const formFields = [
+        //filing
+        {
+          name: "case-number",
+          type: "text",
+          page: 1,
+          x: 13.5,
+          y: 6.3,
+          width: 15,
+          height: 2,
+        },
+        {
+          name: "in-the-matter-of",
+          type: "textarea",
+          page: 1,
+          x: 6.4,
+          y: 15,
+          width: 51,
+          height: 10.75,
+        },
+        {
+          name: "filing-date",
+          type: "date",
+          page: 1,
+          x: 68.75,
+          y: 20.45,
+          width: 18,
+          height: 2,
+        },
+        {
+          name: "filing-judge",
+          type: "text",
+          page: 1,
+          x: 68.75,
+          y: 22.9,
+          width: 18,
+          height: 2,
+        },
+
+        //intro
+
+        {
+          name: "assistant-district-attorney",
+          type: "text",
+          page: 1,
+          x: 49.2,
+          y: 42.125,
+          width: 31.6,
+          height: 1.6,
+        },
+        {
+          name: "affidavit-testimony",
+          type: "text",
+          page: 1,
+          x: 17.9,
+          y: 47,
+          width: 31.6,
+          height: 1.6,
+        },
+        {
+          name: "all-named-children-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 68.7,
+          y: 48.6,
+          width: 2.4,
+          height: 1.65,
+          textAlign: "center",
+        },
+        {
+          name: "specified-children-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 13.2,
+          y: 50.3,
+          width: 2.4,
+          height: 1.65,
+          textAlign: "center",
+        },
+        {
+          name: "specified-children-1",
+          type: "text",
+          page: 1,
+          x: 37.3,
+          y: 50.35,
+          width: 51.3,
+          height: 1.6,
+        },
+        {
+          name: "specified-children-2",
+          type: "text",
+          page: 1,
+          x: 6,
+          y: 52,
+          width: 77.1,
+          height: 1.6,
+        },
+
+        // checkboxes
+
+        {
+          name: "reason-1-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 8.4,
+          y: 55.2,
+          width: 2.4,
+          height: 1.65,
+        },
+        {
+          name: "reason-2-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 8.4,
+          y: 58.6,
+          width: 2.4,
+          height: 1.65,
+        },
+        {
+          name: "reason-3-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 8.4,
+          y: 65.3,
+          width: 2.4,
+          height: 1.65,
+        },
+        {
+          name: "reason-4-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 8.4,
+          y: 73.7,
+          width: 2.4,
+          height: 1.65,
+        },
+        {
+          name: "reason-5-checkbox",
+          type: "checkbox",
+          page: 1,
+          x: 8.4,
+          y: 78.8,
+          width: 2.4,
+          height: 1.65,
+        },
+
+        // page 2
+        {
+          name: "case-number-2",
+          type: "text",
+          page: 2,
+          x: 13.5,
+          y: 6.3,
+          width: 15,
+          height: 2,
+        },
+        {
+          name: "other-reason",
+          type: "textarea",
+          page: 2,
+          x: 9,
+          y: 10,
+          width: 75,
+          height: 7,
+        },
+        {
+          name: "day-of-month",
+          type: "text",
+          page: 2,
+          x: 18,
+          y: 22.4,
+          width: 7.3,
+          height: 1.6,
+        },
+        {
+          name: "month",
+          type: "text",
+          page: 2,
+          x: 32.4,
+          y: 22.4,
+          width: 12.2,
+          height: 1.6,
+        },
+        {
+          name: "year",
+          type: "text",
+          page: 2,
+          x: 49.4,
+          y: 22.4,
+          width: 4.9,
+          height: 1.6,
+        },
+        {
+          name: "signature",
+          type: "signature",
+          page: 2,
+          x: 51.7,
+          y: 24.8,
+          width: 34.3,
+          height: 2.4,
+        },
+      ];
+
+      function debounce(func, delay) {
+        let inDebounce;
+        return () => {
+          const context = this;
+          const args = arguments;
+          clearTimeout(inDebounce);
+          inDebounce = setTimeout(() => func.apply(context, args), delay);
+        };
+      }
+
+      let firstRender = true;
+
+      let fontSizeBase = 8;
+
+      let scale = 1;
+      let currentScale = 0;
+
+      const drawCheckbox = document.querySelector("#draw");
+
+      const scaleRange = document.querySelector("#scale-range");
+      scaleRange.value = scale;
+
+      const documentContainer = document.querySelector(".document-container");
+
+      const debouncedRender = debounce(() => {
+        if (scale !== currentScale) render();
+      }, 250);
+
+      const pageData = [];
+      let pageNumberEdits = [];
+
+      debouncedRender();
+
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey && e.key === "z") {
+          const pageNumber = pageNumberEdits.pop();
+          if (pageNumber) {
+            const data = pageData[pageNumber - 1];
+            const lines = (data && data.lines) || [];
+            lines.pop();
+            render();
+          }
+        }
+      });
+
+      documentContainer.addEventListener("wheel", (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          scale = Math.min(5, Math.max(0.5, scale + e.deltaY * -0.001));
+          scaleRange.value = scale;
+          debouncedRender();
+        }
+      });
+
+      scaleRange.addEventListener("change", (e) => {
+        scale = +scaleRange.value;
+        debouncedRender();
+      });
+
+      document.querySelector("#view").addEventListener("change", (e) => {
+        render();
+      });
+
+      document.querySelector("#type").addEventListener("change", (e) => {
+        render();
+      });
+
+      document.querySelector("#draw").addEventListener("change", (e) => {
+        render();
+      });
+
+      var hammer = new Hammer(documentContainer, {
+        touchAction: "pan-x pan-y",
+      });
+      hammer.get("pinch").set({ enable: true });
+      hammer.on("pinch", (e) => {
+        const deltaY = e.scale > 1 ? -e.scale : e.scale;
+        scale = Math.min(5, Math.max(0.5, scale + deltaY * -0.01));
+        scaleRange.value = scale;
+        debouncedRender();
+      });
+
+      function render() {
+        const scrollXPercentage =
+          window.scrollX / document.documentElement.scrollWidth;
+        const scrollYPercentage =
+          window.scrollY / document.documentElement.scrollHeight;
+
+        currentScale = scale;
+
+        document.getElementById("scale").innerText = currentScale.toFixed(2);
+
+        const loadingTask = pdfjsLib.getDocument(
+          "application-emergency-custody.pdf"
+        );
+        loadingTask.promise.then((pdf) => {
+          // Remove all pages
+          while (documentContainer.firstChild)
+            documentContainer.removeChild(documentContainer.firstElementChild);
+
+          for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            pdf.getPage(pageNumber).then((page) => {
+              const writeEnabled = document.querySelector("#draw").checked;
+              const typeEnabled = document.querySelector("#type").checked;
+
+              const documentPage = document.createElement("div");
+              documentPage.classList.add("document-page");
+
+              if (writeEnabled) {
+                documentPage.classList.add("document-page-write");
+              }
+
+              documentContainer.appendChild(documentPage);
+
+              if (firstRender) {
+                firstRender = false;
+                const desiredWidth = documentPage.clientWidth * 0.95;
+                scale = Math.min(
+                  2,
+                  desiredWidth / page.getViewport({ scale }).width
+                );
+                currentScale = scale;
+                scaleRange.value = scale;
+                document.getElementById("scale").innerText = scale.toFixed(2);
+              }
+
+              const viewport = page.getViewport({ scale });
+
+              documentPage.style.width = `${viewport.width}px`;
+              documentPage.style.height = `${viewport.height}px`;
+              documentPage.style.fontSize = `${fontSizeBase * scale}px`;
+
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              documentPage.appendChild(canvas);
+
+              const data = pageData[pageNumber - 1];
+
+              let oldLines = (data && data.lines) || [];
+
+              const newLines = JSON.parse(JSON.stringify(oldLines));
+
+              if (oldLines) {
+                for (let i = 0; i < oldLines.length; i++) {
+                  for (let j = 0; j < oldLines[i].length; j++) {
+                    newLines[i][j].x =
+                      (oldLines[i][j].x / data.width) * canvas.width;
+                    newLines[i][j].y =
+                      (oldLines[i][j].y / data.height) * canvas.height;
+                  }
+                }
+              }
+
+              const [drawingCanvas, lines] = createDrawingCanvas(
+                viewport.width,
+                viewport.height,
+                newLines,
+                pageNumber
+              );
+              documentPage.appendChild(drawingCanvas);
+
+              const renderContext = {
+                canvasContext: context,
+                viewport: viewport,
+              };
+
+              const renderTask = page.render(renderContext);
+              renderTask.promise.then(function () {
+                console.log(`Page ${pageNumber} rendered`);
+              });
+
+              // Create fields
+              const pageFields = formFields.filter(
+                (f) => f.page === pageNumber
+              );
+              const fields = (data && data.fields) || {};
+
+              for (let i = 0; i < pageFields.length; i++) {
+                let el;
+
+                const fieldName = pageFields[i].name;
+
+                if (!fields[fieldName]) {
+                  fields[fieldName] = {
+                    value: "",
+                  };
+                }
+
+                if (pageFields[i].type === "textarea") {
+                  el = document.createElement("textarea");
+                } else if (pageFields[i].type === "signature") {
+                  el = document.createElement("input");
+                  el.classList.add("form-field-signature");
+                } else if (pageFields[i].type === "checkbox") {
+                  el = document.createElement("input");
+                  el.classList.add("form-field-checkbox");
+                  el.maxLength = 1;
+                } else {
+                  el = document.createElement("input");
+                  el.type = pageFields[i].type;
+                }
+
+                el.classList.add("form-field");
+                el.value = fields[fieldName].value;
+                el.style.left = `${pageFields[i].x}%`;
+                el.style.top = `${pageFields[i].y}%`;
+                el.style.width = `${pageFields[i].width}%`;
+                el.style.height = `${pageFields[i].height}%`;
+                el.style.textAlign = pageFields[i].textAlign;
+
+                if (!typeEnabled) {
+                  el.disabled = "disabled";
+                }
+
+                el.addEventListener("change", (e) => {
+                  fields[fieldName].value = el.value;
+                });
+
+                documentPage.appendChild(el);
+              }
+
+              pageData[pageNumber - 1] = {
+                width: canvas.width,
+                height: canvas.height,
+                lines,
+                fields,
+              };
+
+              if (pageNumber === pdf.numPages) {
+                updateScroll(scrollXPercentage, scrollYPercentage);
+              }
+            });
+          }
+        });
+      }
+
+      function updateScroll(scrollXPercentage, scrollYPercentage) {
+        window.scrollTo(
+          scrollXPercentage * document.documentElement.scrollWidth,
+          scrollYPercentage * document.documentElement.scrollHeight
+        );
+      }
+
+      function createDrawingCanvas(width, height, existingLines, pageNumber) {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.classList.add("drawing-canvas");
+
+        const g = canvas.getContext("2d");
+        g.lineWidth = 1;
+        g.lineJoin = "round";
+        g.shadowBlur = 1;
+        g.shadowColor = "rgb(0, 0, 0)";
+
+        let previousPosition = { x: 0, y: 0 };
+        let currentPosition = { x: 0, y: 0 };
+        let drawing = false;
+        let lines = existingLines || [];
+
+        drawSmooth(canvas, g, lines);
+
+        function startDrawing(e) {
+          if (!shouldProcessEvent(e)) return;
+
+          console.log(e);
+
+          e.preventDefault();
+          previousPosition = currentPosition = calculateMousePosition(
+            canvas,
+            e,
+            currentPosition
+          );
+          lines.push([currentPosition]);
+          drawing = true;
+        }
+
+        function keepDrawing(e) {
+          if (!shouldProcessEvent(e)) return;
+
+          console.log(e);
+
+          e.preventDefault();
+          if (drawing) {
+            previousPosition = currentPosition;
+            currentPosition = calculateMousePosition(
+              canvas,
+              e,
+              currentPosition
+            );
+            draw(g, previousPosition, currentPosition);
+            lines[lines.length - 1].push(currentPosition);
+          }
+        }
+
+        function stopDrawing(e) {
+          if (!shouldProcessEvent(e)) return;
+
+          console.log(e);
+
+          e.preventDefault();
+          if (drawing) {
+            previousPosition = currentPosition;
+            currentPosition = calculateMousePosition(
+              canvas,
+              e,
+              currentPosition
+            );
+            draw(g, previousPosition, currentPosition);
+            lines[lines.length - 1].push(currentPosition);
+            pageNumberEdits.push(pageNumber);
+            drawing = false;
+            drawSmooth(canvas, g, lines);
+          }
+        }
+
+        canvas.addEventListener("mousedown", startDrawing);
+        canvas.addEventListener("touchstart", startDrawing);
+        canvas.addEventListener("mousemove", keepDrawing);
+        canvas.addEventListener("touchmove", keepDrawing);
+        canvas.addEventListener("mouseup", stopDrawing);
+        canvas.addEventListener("mouseout", stopDrawing);
+        canvas.addEventListener("touchend", stopDrawing);
+        canvas.addEventListener("touchcancel", stopDrawing);
+
+        canvas.addEventListener("mousemove", (e) => {
+          const position = calculateMousePosition(canvas, e, currentPosition);
+          position.x = (position.x / canvas.width) * 100;
+          position.y = (position.y / canvas.height) * 100;
+        });
+
+        function calculateMousePosition(canvas, e, defaultPosition) {
+          if (e.touches && e.touches.length === 0) {
+            return defaultPosition;
+          }
+
+          const offsetLeft = canvas.getBoundingClientRect().left;
+          const offsetTop = canvas.getBoundingClientRect().top;
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+          return {
+            x: clientX - offsetLeft,
+            y: clientY - offsetTop,
+          };
+        }
+
+        function shouldProcessEvent(e) {
+          // Filter out multi-touch events
+          return drawCheckbox.checked;
+        }
+
+        function draw(context, previousPosition, currentPosition) {
+          context.beginPath();
+          context.moveTo(previousPosition.x, previousPosition.y);
+          context.lineTo(currentPosition.x, currentPosition.y);
+          context.stroke();
+          context.closePath();
+        }
+
+        function drawSmooth(canvas, context, lines) {
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = 0; i < lines.length; i++) {
+            const points = lines[i];
+            console.log(points.length);
+            if (points.length === 1) {
+              context.fillRect(points[0].x, points[0].y, 1, 1);
+            } else if (points.length === 2) {
+              context.beginPath();
+              context.moveTo(points[0].x, points[0].y);
+              context.lineTo(points[1].x, points[1].y);
+              context.stroke();
+              context.closePath();
+            } else if (points.length >= 2) {
+              let j = 0;
+              context.beginPath();
+              context.moveTo(points[j].x, points[j].y);
+              for (j = 1; j < points.length - 2; j++) {
+                const xc = (points[j].x + points[j + 1].x) / 2;
+                const yc = (points[j].y + points[j + 1].y) / 2;
+                context.quadraticCurveTo(points[j].x, points[j].y, xc, yc);
+              }
+              context.quadraticCurveTo(
+                points[j].x,
+                points[j].y,
+                points[j + 1].x,
+                points[j + 1].y
+              );
+              context.stroke();
+              context.closePath();
+            }
+          }
+        }
+
+        return [canvas, lines];
+      }
+    </script>
+  </body>
+</html>

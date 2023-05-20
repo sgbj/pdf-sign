@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+      crossorigin="anonymous"
+    />
+    <link
+      href="https://fonts.googleapis.com/css?family=Satisfy&display=swap"
+      rel="stylesheet"
+    />
+
+    <title></title>
+
+    <style>
+      .nav-link {
+        padding: 0.25rem 0.5rem;
+      }
+
+      body {
+        background: #fafafa;
+      }
+
+      canvas {
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="modal" tabindex="-1" role="dialog" style="display: block">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Signature</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex justify-content-end">
+              <div class="custom-control custom-radio custom-control-inline">
+                <input
+                  checked
+                  type="radio"
+                  id="customRadioInline1"
+                  name="customRadioInline1"
+                  class="custom-control-input"
+                />
+                <label class="custom-control-label" for="customRadioInline1"
+                  >Draw</label
+                >
+              </div>
+              <div class="custom-control custom-radio custom-control-inline">
+                <input
+                  type="radio"
+                  id="customRadioInline2"
+                  name="customRadioInline1"
+                  class="custom-control-input"
+                />
+                <label class="custom-control-label" for="customRadioInline2"
+                  >Type</label
+                >
+              </div>
+              <div class="custom-control custom-radio custom-control-inline">
+                <input
+                  type="radio"
+                  id="customRadioInline3"
+                  name="customRadioInline1"
+                  class="custom-control-input"
+                />
+                <label class="custom-control-label" for="customRadioInline3"
+                  >Saved</label
+                >
+              </div>
+            </div>
+
+            <canvas id="signature-canvas" width="466" height="150"></canvas>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" id="clear-button">
+              Clear
+            </button>
+            <button type="button" class="btn btn-primary">Continue</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var canvas = document.getElementById("signature-canvas");
+      var g = canvas.getContext("2d");
+      g.lineWidth = 1;
+      g.lineJoin = "round";
+      g.shadowBlur = 1;
+      g.shadowColor = "rgb(0, 0, 0)";
+      g.font = "30px sans-serif";
+
+      var previousPosition = { x: 0, y: 0 };
+      var currentPosition = { x: 0, y: 0 };
+      var drawing = false;
+
+      var lines = [];
+
+      drawSmooth(canvas, g, lines);
+
+      document.getElementById("clear-button").addEventListener("click", (e) => {
+        lines = [];
+        drawSmooth(canvas, g, lines);
+      });
+
+      function startDrawing(e) {
+        e.preventDefault();
+        previousPosition = currentPosition = calculateMousePosition(
+          canvas,
+          e,
+          currentPosition
+        );
+        lines.push([currentPosition]);
+        drawing = true;
+      }
+
+      function keepDrawing(e) {
+        e.preventDefault();
+        if (drawing) {
+          previousPosition = currentPosition;
+          currentPosition = calculateMousePosition(canvas, e, currentPosition);
+          draw(g, previousPosition, currentPosition);
+          lines[lines.length - 1].push(currentPosition);
+        }
+      }
+
+      function stopDrawing(e) {
+        e.preventDefault();
+        if (drawing) {
+          previousPosition = currentPosition;
+          currentPosition = calculateMousePosition(canvas, e, currentPosition);
+          draw(g, previousPosition, currentPosition);
+          lines[lines.length - 1].push(currentPosition);
+          drawing = false;
+          drawSmooth(canvas, g, lines);
+        }
+      }
+
+      canvas.addEventListener("mousedown", startDrawing);
+      canvas.addEventListener("touchstart", startDrawing);
+      canvas.addEventListener("mousemove", keepDrawing);
+      canvas.addEventListener("touchmove", keepDrawing);
+      canvas.addEventListener("mouseup", stopDrawing);
+      canvas.addEventListener("mouseout", stopDrawing);
+      canvas.addEventListener("touchend", stopDrawing);
+      canvas.addEventListener("touchcancel", stopDrawing);
+
+      function calculateMousePosition(canvas, e, defaultPosition) {
+        if (e.touches && e.touches.length === 0) {
+          return currentPosition;
+        }
+
+        const offsetLeft = canvas.getBoundingClientRect().left;
+        const offsetTop = canvas.getBoundingClientRect().top;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        return {
+          x: clientX - offsetLeft,
+          y: clientY - offsetTop,
+        };
+      }
+
+      function draw(context, previousPosition, currentPosition) {
+        context.beginPath();
+        context.moveTo(previousPosition.x, previousPosition.y);
+        context.lineTo(currentPosition.x, currentPosition.y);
+        context.stroke();
+        context.closePath();
+      }
+
+      function drawSmooth(canvas, context, lines) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw signature line
+        context.fillStyle = "rgba(0, 0, 0, .24)";
+        context.strokeStyle = "rgba(0, 0, 0, .24)";
+        context.fillText("×", 0, canvas.height - 45);
+        context.beginPath();
+        context.moveTo(0, canvas.height - 40);
+        context.lineTo(canvas.width, canvas.height - 40);
+        context.stroke();
+        context.closePath();
+
+        context.strokeStyle = "black";
+        context.fillStyle = "black";
+
+        for (var i = 0; i < lines.length; i++) {
+          var points = lines[i];
+
+          if (points.length === 1) {
+            context.fillRect(points[0].x, points[0].y, 1, 1);
+          } else if (points.length === 2) {
+            context.beginPath();
+            context.moveTo(points[0].x, points[0].y);
+            context.lineTo(points[1].x, points[1].y);
+            context.stroke();
+            context.closePath();
+          } else if (points.length >= 2) {
+            var j = 0;
+            context.beginPath();
+            context.moveTo(points[j].x, points[j].y);
+
+            for (j = 1; j < points.length - 2; j++) {
+              var xc = (points[j].x + points[j + 1].x) / 2;
+              var yc = (points[j].y + points[j + 1].y) / 2;
+              context.quadraticCurveTo(points[j].x, points[j].y, xc, yc);
+            }
+
+            context.quadraticCurveTo(
+              points[j].x,
+              points[j].y,
+              points[j + 1].x,
+              points[j + 1].y
+            );
+            context.stroke();
+            context.closePath();
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
